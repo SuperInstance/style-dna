@@ -59,11 +59,19 @@ class StyleExtractor:
         total_beats = max(all_onsets) if all_onsets else 1.0
         total_bars = max(1, int(total_beats / 4))
 
-        # ── Melodic DNA ──
-        interval_dist = self._distribution(all_intervals)
-        mean_int = sum(abs(i) for i in all_intervals) / len(all_intervals) if all_intervals else 0
-        steps = sum(1 for i in all_intervals if abs(i) <= 2)
-        step_leap = steps / len(all_intervals) if all_intervals else 0
+        # ── Melodic DNA (per-voice intervals only) ──
+        voice_intervals: list[int] = []
+        for tid, tnotes in track_notes.items():
+            tnotes.sort(key=lambda x: x[0])  # sort by onset
+            for i in range(len(tnotes) - 1):
+                voice_intervals.append(tnotes[i + 1][1] - tnotes[i][1])
+        # Fall back to all_intervals if no per-track intervals
+        melodic_intervals = voice_intervals if voice_intervals else all_intervals
+
+        interval_dist = self._distribution(melodic_intervals)
+        mean_int = sum(abs(i) for i in melodic_intervals) / len(melodic_intervals) if melodic_intervals else 0
+        steps = sum(1 for i in melodic_intervals if abs(i) <= 2)
+        step_leap = steps / len(melodic_intervals) if melodic_intervals else 0
 
         CONSONANT = {0, 3, 4, 7, 8, 9, 12}
         consonant = sum(1 for i in all_intervals if abs(i) % 12 in CONSONANT)
@@ -153,6 +161,17 @@ class StyleExtractor:
         # Sort by onset for interval computation
         paired = sorted(zip(onsets, pitches))
         intervals = [paired[i + 1][1] - paired[i][1] for i in range(len(paired) - 1)]
+
+        # Filter out rests (note=0) from pitch collections to avoid corrupting
+        # pitch_center and melodic_range metrics
+        pitches_no_rests = [p for p in pitches if p > 0]
+        if pitches_no_rests:
+            # Replace all_pitches references downstream with filtered list
+            pitches[:] = pitches_no_rests
+            onsets_filtered = []
+            # Rebuild paired without rests
+            paired = sorted(zip(onsets, [p for p in pitches]))
+            intervals = [paired[i + 1][1] - paired[i][1] for i in range(len(paired) - 1)]
 
         return intervals, durations, pitches, onsets, velocities, track_notes
 
