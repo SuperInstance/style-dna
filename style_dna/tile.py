@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import ClassVar, Dict, Tuple
 import json
 import math
 
@@ -106,6 +106,35 @@ class StyleTile:
                 data[key] = tuple(data[key])
         return cls(**data)
 
+    # Field ranges for min-max normalization (field_name, min, max)
+    _FIELD_RANGES: ClassVar[list[tuple[str, float, float]]] = [
+        ('consonance_rate', 0.0, 1.0),
+        ('syncopation_rate', 0.0, 1.0),
+        ('mean_interval', 0.0, 12.0),
+        ('step_vs_leap_ratio', 0.0, 1.0),
+        ('rhythmic_entropy', 0.0, 5.0),
+        ('notes_per_bar', 0.0, 20.0),
+        ('pitch_center', 20.0, 108.0),
+    ]
+
+    def _normalized_vector(self) -> list[float]:
+        """Min-max normalized core fields for similarity comparison."""
+        vals = {
+            'consonance_rate': self.consonance_rate,
+            'syncopation_rate': self.syncopation_rate,
+            'mean_interval': self.mean_interval,
+            'step_vs_leap_ratio': self.step_vs_leap_ratio,
+            'rhythmic_entropy': self.rhythmic_entropy,
+            'notes_per_bar': self.notes_per_bar,
+            'pitch_center': self.pitch_center,
+        }
+        vec = []
+        for name, lo, hi in self._FIELD_RANGES:
+            v = vals[name]
+            norm = (v - lo) / (hi - lo) if hi > lo else 0.0
+            vec.append(max(0.0, min(1.0, norm)))
+        return vec
+
     def _numeric_vector(self) -> list[float]:
         """All numeric fields as a flat vector for similarity comparison."""
         return [
@@ -136,9 +165,9 @@ class StyleTile:
         ]
 
     def similarity(self, other: 'StyleTile') -> float:
-        """Cosine similarity over numeric fields. 1.0 = identical direction."""
-        v1 = self._numeric_vector()
-        v2 = other._numeric_vector()
+        """Cosine similarity over min-max normalized fields. 1.0 = identical direction."""
+        v1 = self._normalized_vector()
+        v2 = other._normalized_vector()
         dot = sum(a * b for a, b in zip(v1, v2))
         mag1 = math.sqrt(sum(a * a for a in v1))
         mag2 = math.sqrt(sum(b * b for b in v2))
