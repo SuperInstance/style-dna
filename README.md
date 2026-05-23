@@ -1,82 +1,105 @@
-# style-dna
+# style-dna — Musical DNA Extraction, Comparison & Morphing
 
-Musical DNA extraction, analysis, and style morphing system. Extract a composer's irreducible musical fingerprint from MIDI files, compare styles mathematically, and morph music toward target styles.
+Extract a composer's irreducible musical fingerprint from MIDI files, compare styles mathematically, and morph music toward target styles. Every composer has a DNA signature — topological, dynamical, and statistical invariants that survive across their entire corpus.
 
-## What It Does
+## Install
 
-- **Extract** a `StyleTile` — a frozen dataclass capturing melodic, rhythmic, harmonic, register, and deep mathematical invariants (Betti numbers, Lyapunov exponent, entropy ratio, mutual information, holonomy range, 留白 rate) from any corpus of MIDI files
-- **Compare** composers via cosine similarity over high-dimensional DNA vectors
-- **Morph** MIDI files toward target styles with controllable blend
-- **Pre-built tiles** for Bach, Chopin, Joplin, Debussy, and Coltrane based on musicological research
+```bash
+pip install style-dna
+```
+
+Requires Python 3.10+, `mido`, `numpy`.
 
 ## Quick Start
 
 ```python
 from style_dna import StyleExtractor, StyleMorpher, PERSONALITIES
 
-# Extract from your MIDI files
+# Extract Bach's DNA from a corpus
 ext = StyleExtractor()
-tile = ext.extract(["piece1.mid", "piece2.mid"], composer="MyStyle", era="modern")
+bach = ext.extract(
+    ["bach_invention_1.mid", "bach_invention_8.mid"],
+    composer="Bach",
+    era="baroque",
+)
 
-# Compare to Bach
-similarity = tile.similarity(PERSONALITIES["Bach"])
-print(f"Similarity to Bach: {similarity:.3f}")
+# Compare to pre-built profiles
+sim = bach.similarity_to(PERSONALITIES["Chopin"])
+print(f"Bach ↔ Chopin similarity: {sim:.3f}")
 
-# Morph toward Joplin
+# Morph a piece toward Coltrane's style
 morpher = StyleMorpher()
-output = morpher.morph("input.mid", PERSONALITIES["Joplin"], blend=0.8)
+output = morpher.morph("input.mid", PERSONALITIES["Coltrane"], blend=0.7)
+print(f"Morphed output: {output}")
 ```
 
-## Architecture
+## The Key Idea
 
-```
-style_dna/
-├── tile.py           # StyleTile dataclass (25+ fields)
-├── extract.py        # StyleExtractor — full pipeline with deep invariants
-├── morph.py          # StyleMorpher — per-layer MIDI transformation
-├── personalities.py  # Pre-built tiles: Bach, Chopin, Joplin, Debussy, Coltrane
-└── __init__.py
+Two composers can share the same key, tempo, and instrumentation — and still sound completely different. The difference lives in their deep invariants: topological structure (Betti numbers), dynamical regime (Lyapunov exponent), information density (entropy ratio), and tonal journey breadth (holonomy range). These are the irreducible dimensions of musical style.
 
-tests/
-└── test_style_dna.py # Full test suite
-
-examples/
-└── demo_morph.py     # Interactive demo
-```
+Style-dna extracts these invariants as a `StyleTile` — a frozen dataclass with 25+ fields. The similarity metric is cosine distance over this high-dimensional vector. Morphing applies per-layer adjustments (register, rhythm, harmony, contour) controlled by a single blend parameter.
 
 ## Deep Invariants
 
-Beyond basic statistics, each StyleTile captures:
+| Invariant | What It Measures | Typical Values |
+|-----------|-----------------|----------------|
+| `betti_numbers` | Topological complexity (components + loops) | Bach: structured, Coltrane: complex |
+| `lyapunov_exponent` | Predictability vs chaos | Bach ≈ 0.01, Coltrane ≈ 0.30 |
+| `entropy_ratio` | Deep structure vs surface variety | Bach ≈ 0.29 |
+| `mutual_information` | Between-voice dependency | Higher = more coordinated voices |
+| `holonomy_range` | Tonal journey breadth | Wider = more modulation |
+| `chinese_liubai_rate` | Silence / negative-space fraction (留白) | Debussy: high, Bach: low |
 
-| Invariant | What it measures |
-|-----------|-----------------|
-| `betti_numbers` | Topological fingerprint — connected components and loops in melodic contour |
-| `euler_characteristic` | β₀ − β₁ per 100 notes; negative = composed/structured |
-| `lyapunov_exponent` | Dynamical regime: quasi-periodic (Bach ≈ 0.01) to chaotic (Coltrane ≈ 0.30) |
-| `entropy_ratio` | H∞/H₁ — deep structure (Bach ≈ 0.29) vs surface variety |
-| `mutual_information` | Between-voice information sharing in multi-track MIDI |
-| `holonomy_range` | How far pitches drift from estimated key center |
-| `chinese_liubai_rate` | Silence / negative-space fraction (留白) |
+## API Reference
 
-## Install
+### StyleExtractor
 
-```bash
-pip install -e .
-# or just: pip install mido
+```python
+ext = StyleExtractor()
+tile = ext.extract(midi_paths=["piece1.mid", ...], composer="Name", era="baroque")
+# → StyleTile (frozen dataclass)
 ```
 
-## Run Tests
+### StyleTile
 
-```bash
-cd style-dna
-python -m pytest tests/ -v
+```python
+tile.similarity_to(other)          # → float (cosine similarity, 0-1)
+tile.melodic_interval_profile      # → dict[int, float]
+tile.rhythmic_profile              # → dict[float, float]
+tile.harmonic_profile              # → dict[str, float]
+tile.register_center               # → float (mean MIDI pitch)
+tile.betti_numbers                 # → list[int]
+tile.lyapunov_exponent             # → float
+tile.entropy_ratio                 # → float
 ```
 
-## Run Demo
+### StyleMorpher
 
-```bash
-python examples/demo_morph.py
+```python
+morpher = StyleMorpher(seed=42)
+output = morpher.morph(
+    midi_path="input.mid",
+    target=PERSONALITIES["Coltrane"],
+    blend=0.7,              # 0=no change, 1=full morph
+    output_path="out.mid",  # auto-generated if None
+)
 ```
+
+### PERSONALITIES
+
+Pre-extracted tiles: Bach, Chopin, Joplin, Debussy, Coltrane.
+
+## Documentation
+
+- [User Guide](docs/USER-GUIDE.md) — Complete usage documentation
+- [Developer Guide](docs/DEVELOPER-GUIDE.md) — Contributing and internals
+- [Examples](examples/) — Style morphing demo
+
+## Related
+
+- [constraint-theory-core](https://github.com/SuperInstance/constraint-theory-core) — The mathematical primitives underneath
+- [holonomy-harmony](https://github.com/SuperInstance/holonomy-harmony) — Chord progression analysis via holonomy
+- [flux-tensor-midi](https://github.com/SuperInstance/flux-tensor-midi) — 4D tensor representation of MIDI events
 
 ## License
 
